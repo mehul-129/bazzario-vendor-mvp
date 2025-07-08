@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bazzario Vendor MVP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-gray-800 font-sans transition-all">
+  <div class="max-w-md mx-auto p-4 pb-24">
+    <!-- Logo & Title -->
+    <div class="text-center mb-4">
+      <img src="https://i.postimg.cc/2yY0hBGM/bazzario-logo.png" alt="Bazzario Logo" class="mx-auto h-16" />
+      <h1 class="text-3xl font-bold text-indigo-600">Bazzario Vendor</h1>
+    </div>
+
+    <!-- Auth Section -->
+    <div id="auth" class="space-y-4">
+      <input id="email" type="email" placeholder="Email (e.g. user@bazzario.com)" class="w-full p-3 border rounded-lg" />
+      <input id="password" type="password" placeholder="Password" class="w-full p-3 border rounded-lg" />
+      <div class="flex gap-2 justify-between">
+        <button onclick="login()" class="w-1/2 bg-indigo-600 text-white py-2 rounded-lg">Login</button>
+        <button onclick="signup()" class="w-1/2 bg-green-600 text-white py-2 rounded-lg">Sign Up</button>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden space-y-6 mt-6">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold text-indigo-700">Dashboard</h2>
+        <button onclick="logout()" class="text-red-600">Logout</button>
+      </div>
+
+      <!-- Wallet -->
+      <div class="p-4 bg-indigo-50 rounded-lg">
+        <div class="flex justify-between mb-2">
+          <span class="font-semibold">Wallet Balance</span>
+          <span id="walletBalance" class="font-bold text-lg">₹0</span>
+        </div>
+        <div class="flex gap-2 mb-2">
+          <input id="addFunds" type="number" placeholder="Add ₹" class="flex-1 p-2 border rounded" />
+          <button onclick="addToWallet()" class="bg-indigo-600 text-white px-4 py-2 rounded">Add</button>
+        </div>
+        <div class="flex gap-2">
+          <input id="withdrawAmount" type="number" placeholder="Withdraw ₹" class="flex-1 p-2 border rounded" />
+          <button onclick="withdrawFunds()" class="bg-red-600 text-white px-4 py-2 rounded">Withdraw</button>
+        </div>
+      </div>
+
+      <!-- Analytics -->
+      <div class="bg-white shadow p-4 rounded-lg border border-gray-200">
+        <h3 class="text-lg font-semibold mb-2">📊 Analytics</h3>
+        <p>Total Products: <span id="analyticsTotal">0</span></p>
+        <p>Inventory Value: ₹<span id="analyticsValue">0</span></p>
+        <p>Estimated Profit: ₹<span id="analyticsProfit">0</span></p>
+      </div>
+
+      <!-- Add Product -->
+      <div class="bg-white shadow p-4 rounded-lg space-y-2 border border-gray-200">
+        <h3 class="text-lg font-semibold">Add Product</h3>
+        <input id="productName" placeholder="Name" class="w-full p-2 border rounded" />
+        <input id="stock" type="number" placeholder="Stock" class="w-full p-2 border rounded" />
+        <input id="cost" type="number" placeholder="Cost Price" class="w-full p-2 border rounded" />
+        <input id="price" type="number" placeholder="Selling Price" class="w-full p-2 border rounded" />
+        <input id="image" type="file" class="w-full p-2 border rounded" />
+        <select id="category" class="w-full p-2 border rounded">
+          <option value="">Select Category</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Clothing">Clothing</option>
+          <option value="Grocery">Grocery</option>
+          <option value="Others">Others</option>
+        </select>
+        <button onclick="uploadProduct()" class="w-full bg-indigo-600 text-white py-2 rounded">Upload</button>
+      </div>
+
+      <!-- Search & Export -->
+      <input id="search" oninput="loadProducts()" placeholder="Search Products..." class="w-full p-2 border rounded mt-2" />
+      <div class="text-center space-y-2 mt-2">
+        <button onclick="exportCSV()" class="bg-blue-500 text-white px-4 py-2 rounded">Export Products CSV</button>
+        <button onclick="exportOrdersCSV()" class="bg-green-600 text-white px-4 py-2 rounded">Export Orders CSV</button>
+      </div>
+
+      <!-- Products -->
+      <div>
+        <h3 class="text-lg font-semibold mt-4">Your Products</h3>
+        <div id="products" class="space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="fixed bottom-0 left-0 w-full bg-indigo-100 text-center py-2 shadow-inner border-t border-indigo-300">
+    <button onclick="toggleDarkMode()" class="text-sm bg-black text-white px-3 py-1 rounded">Toggle Dark Mode</button>
+  </div>
+
+  <!-- JS Logic -->
+  <script>
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    let currentUser  = localStorage.getItem("loggedIn");
+
+    const authDiv = document.getElementById("auth");
+    const dashboard = document.getElementById("dashboard");
+
+    if (currentUser ) init();
+
+    function val(id) {
+      return document.getElementById(id).value;
+    }
+
+    function signup() {
+      const email = val("email");
+      const password = val("password");
+      if (!email || !password) return alert("Fill all fields");
+      if (users.find(u => u.email === email)) return alert("User  already exists");
+      users.push({ email, password, wallet: 0, products: [], orders: [] });
+      localStorage.setItem("users", JSON.stringify(users));
+      alert("Signup successful.");
+    }
+
+    function login() {
+      const email = val("email");
+      const password = val("password");
+      const user = users.find(u => u.email === email && u.password === password);
+      if (!user) return alert("Invalid credentials");
+      localStorage.setItem("loggedIn", email);
+      init();
+    }
+
+    function logout() {
+      localStorage.removeItem("loggedIn");
+      location.reload();
+    }
+
+    function init() {
+      authDiv.classList.add("hidden");
+      dashboard.classList.remove("hidden");
+      updateWallet();
+      loadProducts();
+      updateAnalytics();
+    }
+
+    function getUser () {
+      return users.find(u => u.email === currentUser  || u.email === localStorage.getItem("loggedIn"));
+    }
+
+    function updateUser (cb) {
+      users = users.map(u => {
+        if (u.email === currentUser  || u.email === localStorage.getItem("loggedIn")) cb(u);
+        return u;
+      });
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+
+    function updateWallet() {
+      const user = getUser ();
+      document.getElementById("walletBalance").textContent = `₹${user.wallet}`;
+    }
+
+    function addToWallet() {
+      const amt = parseFloat(val("addFunds"));
+      if (isNaN(amt) || amt <= 0) return alert("Enter valid amount");
+      updateUser (u => u.wallet += amt);
+      updateWallet();
+    }
+
+    function withdrawFunds() {
+      const amt = parseFloat(val("withdrawAmount"));
+      if (isNaN(amt) || amt <= 0) return alert("Enter valid amount");
+      updateUser (user => {
+        if (user.wallet >= amt) user.wallet -= amt;
+        else alert("Insufficient balance");
+      });
+      updateWallet();
+    }
+
+    function uploadProduct() {
+      const name = val("productName"), stock = parseInt(val("stock")), cost = parseFloat(val("cost")), price = parseFloat(val("price")), category = val("category");
+      const image = document.getElementById("image").files[0];
+      if (!name || !stock || !cost || !price || !image || !category) return alert("All fields required");
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const imageUrl = reader.result;
+        updateUser (user => {
+          user.products.push({ name, stock, cost, price, category, imageUrl });
+        });
+        loadProducts();
+        updateAnalytics();
+      };
+      reader.readAsDataURL(image);
+    }
+
+    function loadProducts() {
+      const user = getUser ();
+      const div = document.getElementById("products");
+      const search = val("search").toLowerCase();
+      div.innerHTML = "";
+      user.products.forEach((p, i) => {
+        if (p.name.toLowerCase().includes(search)) {
+          const alert = p.stock < 5 ? '<span class="text-red-600 text-sm">Low Stock</span>' : "";
+          div.innerHTML += `
+            <div class="p-3 bg-white rounded shadow flex items-center justify-between">
+              <img src="${p.imageUrl}" class="h-14 w-14 object-cover rounded" />
+              <div class="flex-1 ml-3">
+                <p class="font-bold">${p.name}</p>
+                <p class="text-sm text-gray-600">${p.category} | Stock: ${p.stock}, ₹${p.cost} → ₹${p.price} ${alert}</p>
+              </div>
+              <div class="flex flex-col gap-1">
+                <button onclick="sellProduct(${i})" class="text-xs px-2 py-1 bg-green-500 text-white rounded">Sell</button>
+                <button onclick="editProduct(${i})" class="text-xs px-2 py-1 bg-yellow-500 text-white rounded">Edit</button>
+                <button onclick="deleteProduct(${i})" class="text-xs px-2 py-1 bg-red-500 text-white rounded">Delete</button>
+              </div>
+            </div>`;
+        }
+      });
+    }
+
+    function editProduct(index) {
+      const user = getUser ();
+      const p = user.products[index];
+      const name = prompt("Update Name", p.name);
+      const stock = prompt("Update Stock", p.stock);
+      const cost = prompt("Update Cost Price", p.cost);
+      const price = prompt("Update Selling Price", p.price);
+      if (name && stock && cost && price) {
+        updateUser (u => {
+          u.products[index] = { ...p, name, stock: parseInt(stock), cost: parseFloat(cost), price: parseFloat(price) };
+        });
+        loadProducts();
+        updateAnalytics();
+      }
+    }
+
+    function deleteProduct(index) {
+      updateUser (user => {
+        user.products.splice(index, 1);
+      });
+      loadProducts();
+      updateAnalytics();
+    }
+
+    function sellProduct(index) {
+      updateUser (user => {
+        const p = user.products[index];
+        if (p.stock > 0) {
+          p.stock--;
+          user.wallet += p.price;
+          user.orders.push({ name: p.name, price: p.price, date: new Date().toLocaleString() });
+        } else {
+          alert("Out of stock");
+        }
+      });
+      updateWallet();
+      loadProducts();
+      updateAnalytics();
+    }
+
+    function updateAnalytics() {
+      const user = getUser ();
+      let total = 0, inventory = 0, profit = 0;
+      user.products.forEach(p => {
+        total++;
+        inventory += p.stock * p.cost;
+        profit += p.stock * (p.price - p.cost);
+      });
+      document.getElementById("analyticsTotal").textContent = total;
+      document.getElementById("analyticsValue").textContent = inventory;
+      document.getElementById("analyticsProfit").textContent = profit;
+    }
+
+    function exportCSV() {
+      const user = getUser ();
+      const rows = [["Name", "Stock", "Cost", "Price", "Category"]];
+      user.products.forEach(p => rows.push([p.name, p.stock, p.cost, p.price, p.category]));
+      const blob = new Blob([rows.map(r => r.join(",")).join("\\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "products.csv";
+      link.click();
+    }
+
+    function exportOrdersCSV() {
+      const user = getUser ();
+      const rows = [["Product Name", "Price", "Date"]];
+      if (!user.orders || user.orders.length === 0) return alert("No orders to export");
+      user.orders.forEach(o => rows.push([o.name, o.price, o.date]));
+      const blob = new Blob([rows.map(r => r.join(",")).join("\\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "orders.csv";
+      link.click();
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("bg-white");
+      document.body.classList.toggle("bg-gray-900");
+      document.body.classList.toggle("text-gray-800");
+      document.body.classList.toggle("text-white");
+    }
+  </script>
+</body>
+</html>
